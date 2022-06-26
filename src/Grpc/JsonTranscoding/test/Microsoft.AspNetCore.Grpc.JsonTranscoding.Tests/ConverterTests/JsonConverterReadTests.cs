@@ -21,20 +21,23 @@ public class JsonConverterReadTests
     }
 
     [Fact]
-    public void sfsdfds()
+    public void NonJsonName()
     {
-        var r = new HelloRequest
-        {
-            Name = "Hi"
-        };
+        var json = @"{
+  ""field_name"": ""A field name""
+}";
 
-        var json = JsonSerializer.Serialize(r, new JsonSerializerOptions
-        {
-            TypeInfoResolver = new MessageTypeInfoResolver(
-                new JsonContext(new GrpcJsonSettings() { IgnoreDefaultValues = true }, null!)),
-            WriteIndented = true
-        });
-        _output.WriteLine(json);
+        AssertReadJson<HelloRequest>(json);
+    }
+
+    [Fact]
+    public void JsonCustomizedName()
+    {
+        var json = @"{
+  ""json_customized_name"": ""A field name""
+}";
+
+        AssertReadJson<HelloRequest>(json);
     }
 
     [Fact]

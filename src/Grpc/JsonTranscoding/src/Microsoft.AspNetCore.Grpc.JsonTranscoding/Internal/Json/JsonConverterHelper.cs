@@ -29,7 +29,8 @@ internal static class JsonConverterHelper
         {
             WriteIndented = writeIndented,
             NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals,
-            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+            TypeInfoResolver = new MessageTypeInfoResolver(context)
         };
         options.Converters.Add(new NullValueConverter());
         options.Converters.Add(new ByteStringConverter());
@@ -39,7 +40,6 @@ internal static class JsonConverterHelper
         options.Converters.Add(new JsonConverterFactoryForEnum(context));
         options.Converters.Add(new JsonConverterFactoryForWrappers(context));
         options.Converters.Add(new JsonConverterFactoryForWellKnownTypes(context));
-        options.Converters.Add(new JsonConverterFactoryForMessage(context));
 
         return options;
     }
@@ -148,13 +148,77 @@ internal static class JsonConverterHelper
     public static void PopulateList(ref Utf8JsonReader reader, JsonSerializerOptions options, IMessage message, FieldDescriptor fieldDescriptor)
     {
         var fieldType = GetFieldType(fieldDescriptor);
-        var repeatedFieldType = typeof(List<>).MakeGenericType(fieldType);
+        var itemType = fieldType.GetGenericArguments()[0];
+        var repeatedFieldType = typeof(List<>).MakeGenericType(itemType);
         var newValues = (IList)JsonSerializer.Deserialize(ref reader, repeatedFieldType, options)!;
 
         var existingValue = (IList)fieldDescriptor.Accessor.GetValue(message);
         foreach (var item in newValues)
         {
             existingValue.Add(item);
+        }
+    }
+
+    /// <summary>
+    /// Determines whether or not a field value should be serialized according to the field,
+    /// its value in the message, and the settings of this formatter.
+    /// </summary>
+    public static bool ShouldFormatFieldValue(IMessage message, FieldDescriptor field, object? value, bool formatDefaultValues) =>
+        field.HasPresence
+        // Fields that support presence *just* use that
+        ? field.Accessor.HasValue(message)
+        // Otherwise, format if either we've been asked to format default values, or if it's
+        // not a default value anyway.
+        : formatDefaultValues || !IsDefaultValue(field, value);
+
+    private static bool IsDefaultValue(FieldDescriptor descriptor, object? value)
+    {
+        if (value == null)
+        {
+            return true;
+        }
+        if (descriptor.IsMap)
+        {
+            var dictionary = (IDictionary)value;
+            return dictionary.Count == 0;
+        }
+        if (descriptor.IsRepeated)
+        {
+            var list = (IList)value;
+            return list.Count == 0;
+        }
+        switch (descriptor.FieldType)
+        {
+            case FieldType.Bool:
+                return (bool)value == false;
+            case FieldType.Bytes:
+                return (ByteString)value == ByteString.Empty;
+            case FieldType.String:
+                return (string)value == "";
+            case FieldType.Double:
+                return (double)value == 0.0;
+            case FieldType.SInt32:
+            case FieldType.Int32:
+            case FieldType.SFixed32:
+            case FieldType.Enum:
+                return (int)value == 0;
+            case FieldType.Fixed32:
+            case FieldType.UInt32:
+                return (uint)value == 0;
+            case FieldType.Fixed64:
+            case FieldType.UInt64:
+                return (ulong)value == 0;
+            case FieldType.SFixed64:
+            case FieldType.Int64:
+            case FieldType.SInt64:
+                return (long)value == 0;
+            case FieldType.Float:
+                return (float)value == 0f;
+            case FieldType.Message:
+            case FieldType.Group: // Never expect to get this, but...
+                return value == null;
+            default:
+                throw new ArgumentException("Invalid field type");
         }
     }
 }
