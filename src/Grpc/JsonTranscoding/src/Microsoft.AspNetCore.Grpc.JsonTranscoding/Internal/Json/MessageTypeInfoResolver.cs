@@ -22,34 +22,10 @@ internal sealed class MessageTypeInfoResolver : DefaultJsonTypeInfoResolver
         _context = context;
     }
 
-    private static bool IsStandardMessage(Type type, [NotNullWhen(true)] out MessageDescriptor? messageDescriptor)
-    {
-        if (!typeof(IMessage).IsAssignableFrom(type))
-        {
-            messageDescriptor = null;
-            return false;
-        }
-
-        messageDescriptor = JsonConverterHelper.GetMessageDescriptor(type);
-        if (messageDescriptor == null)
-        {
-            return false;
-        }
-        if (ServiceDescriptorHelpers.IsWrapperType(messageDescriptor))
-        {
-            return false;
-        }
-        if (WellKnownTypeNames.ContainsKey(messageDescriptor.FullName))
-        {
-            return false;
-        }
-
-        return true;
-    }
-
     public override JsonTypeInfo GetTypeInfo(Type type, JsonSerializerOptions options)
     {
         var typeInfo = base.GetTypeInfo(type, options);
+
         if (IsStandardMessage(type, out var messageDescriptor))
         {
             typeInfo.Properties.Clear();
@@ -74,7 +50,35 @@ internal sealed class MessageTypeInfoResolver : DefaultJsonTypeInfoResolver
                 typeInfo.Properties.Add(propertyInfo);
             }
         }
+
         return typeInfo;
+    }
+
+    private static bool IsStandardMessage(Type type, [NotNullWhen(true)] out MessageDescriptor? messageDescriptor)
+    {
+        if (!typeof(IMessage).IsAssignableFrom(type))
+        {
+            messageDescriptor = null;
+            return false;
+        }
+
+        messageDescriptor = JsonConverterHelper.GetMessageDescriptor(type);
+        if (messageDescriptor == null)
+        {
+            return false;
+        }
+
+        // Wrappers and well known types are handled by converters.
+        if (ServiceDescriptorHelpers.IsWrapperType(messageDescriptor))
+        {
+            return false;
+        }
+        if (JsonConverterHelper.WellKnownTypeNames.ContainsKey(messageDescriptor.FullName))
+        {
+            return false;
+        }
+
+        return true;
     }
 
     private JsonPropertyInfo CreatePropertyInfo(JsonTypeInfo typeInfo, string name, FieldDescriptor field, bool isWritable)
@@ -158,15 +162,4 @@ internal sealed class MessageTypeInfoResolver : DefaultJsonTypeInfoResolver
         }
         return new Dictionary<string, FieldDescriptor>(map);
     }
-
-    private static readonly Dictionary<string, Type> WellKnownTypeNames = new Dictionary<string, Type>
-    {
-        [Any.Descriptor.FullName] = typeof(AnyConverter<>),
-        [Duration.Descriptor.FullName] = typeof(DurationConverter<>),
-        [Timestamp.Descriptor.FullName] = typeof(TimestampConverter<>),
-        [FieldMask.Descriptor.FullName] = typeof(FieldMaskConverter<>),
-        [Struct.Descriptor.FullName] = typeof(StructConverter<>),
-        [ListValue.Descriptor.FullName] = typeof(ListValueConverter<>),
-        [Value.Descriptor.FullName] = typeof(ValueConverter<>),
-    };
 }

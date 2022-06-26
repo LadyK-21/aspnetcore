@@ -19,6 +19,17 @@ internal static class JsonConverterHelper
 {
     internal const int WrapperValueFieldNumber = Int32Value.ValueFieldNumber;
 
+    internal static readonly Dictionary<string, Type> WellKnownTypeNames = new Dictionary<string, Type>
+    {
+        [Any.Descriptor.FullName] = typeof(AnyConverter<>),
+        [Duration.Descriptor.FullName] = typeof(DurationConverter<>),
+        [Timestamp.Descriptor.FullName] = typeof(TimestampConverter<>),
+        [FieldMask.Descriptor.FullName] = typeof(FieldMaskConverter<>),
+        [Struct.Descriptor.FullName] = typeof(StructConverter<>),
+        [ListValue.Descriptor.FullName] = typeof(ListValueConverter<>),
+        [Value.Descriptor.FullName] = typeof(ValueConverter<>),
+    };
+
     internal static JsonSerializerOptions CreateSerializerOptions(JsonContext context, bool isStreamingOptions = false)
     {
         // Streaming is line delimited between messages. That means JSON can't be indented as it adds new lines.
