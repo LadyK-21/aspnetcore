@@ -7,6 +7,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Google.Protobuf;
+using Google.Protobuf.Collections;
 using Google.Protobuf.Reflection;
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Shared;
@@ -44,6 +45,28 @@ internal static class JsonConverterHelper
     }
 
     internal static Type GetFieldType(FieldDescriptor descriptor)
+    {
+        if (descriptor.IsMap)
+        {
+            var mapFields = descriptor.MessageType.Fields.InFieldNumberOrder();
+            var keyField = mapFields[0];
+            var valueField = mapFields[1];
+
+            return typeof(MapField<,>).MakeGenericType(GetFieldTypeCore(keyField), GetFieldTypeCore(valueField));
+        }
+        else if (descriptor.IsRepeated)
+        {
+            var itemType = GetFieldTypeCore(descriptor);
+
+            return typeof(RepeatedField<>).MakeGenericType(itemType);
+        }
+        else
+        {
+            return GetFieldTypeCore(descriptor);
+        }   
+    }
+
+    private static Type GetFieldTypeCore(FieldDescriptor descriptor)
     {
         switch (descriptor.FieldType)
         {
@@ -85,6 +108,7 @@ internal static class JsonConverterHelper
 
                     return t;
                 }
+
                 return descriptor.MessageType.ClrType;
             default:
                 throw new ArgumentException("Invalid field type");

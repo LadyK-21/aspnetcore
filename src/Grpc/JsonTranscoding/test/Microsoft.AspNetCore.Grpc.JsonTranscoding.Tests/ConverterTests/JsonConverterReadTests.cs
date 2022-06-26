@@ -21,6 +21,23 @@ public class JsonConverterReadTests
     }
 
     [Fact]
+    public void sfsdfds()
+    {
+        var r = new HelloRequest
+        {
+            Name = "Hi"
+        };
+
+        var json = JsonSerializer.Serialize(r, new JsonSerializerOptions
+        {
+            TypeInfoResolver = new MessageTypeInfoResolver(
+                new JsonContext(new GrpcJsonSettings() { IgnoreDefaultValues = true }, null!)),
+            WriteIndented = true
+        });
+        _output.WriteLine(json);
+    }
+
+    [Fact]
     public void ReadObjectProperties()
     {
         var json = @"{
